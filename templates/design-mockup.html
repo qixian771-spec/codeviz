@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeViz · 流动导图 v4</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-app: #08080C;
+  --bg-card: rgba(20, 20, 28, 0.55);
+  --bg-elevated: rgba(28, 28, 38, 0.75);
+  --bg-phase: rgba(255, 255, 255, 0.015);
+  --text-primary: #F4F4F5;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #71717A;
+  --border: rgba(82, 82, 91, 0.25);
+  --border-soft: rgba(63, 63, 70, 0.3);
+  --flow: #8B5CF6;
+  --flow-glow: rgba(139, 92, 246, 0.6);
+  --pending-fill: rgba(39, 39, 45, 0.5);
+  --pending-border: #52525B;
+  --pending-text: #A1A1AA;
+  --progress-fill: rgba(120, 53, 15, 0.2);
+  --progress-border: #F59E0B;
+  --progress-text: #FCD34D;
+  --progress-glow: rgba(245, 158, 11, 0.5);
+  --done-fill: rgba(6, 78, 59, 0.15);
+  --done-border: #10B981;
+  --done-text: #6EE7B7;
+  --done-glow: rgba(16, 185, 129, 0.4);
+  --error-fill: rgba(127, 29, 29, 0.25);
+  --error-border: #EF4444;
+  --error-text: #FCA5A5;
+  --error-glow: rgba(239, 68, 68, 0.6);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-flow: cubic-bezier(0.4, 0, 0.6, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg-app);
+}
+
+/* 多层背景：网格 + 光晕 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.025) 1px, transparent 0);
+  background-size: 32px 32px;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 15% 10%, rgba(139, 92, 246, 0.12), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 90%, rgba(16, 185, 129, 0.08), transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(245, 158, 11, 0.04), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 顶部栏 ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  flex-shrink: 0;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #8B5CF6 0%, #6366F1 50%, #10B981 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
+  position: relative;
+}
+
+.brand-logo::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #8B5CF6, #10B981);
+  z-index: -1;
+  filter: blur(8px);
+  opacity: 0.5;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.project-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  backdrop-filter: blur(20px);
+  cursor: pointer;
+  transition: all 250ms var(--ease);
+}
+
+.project-pill:hover {
+  border-color: var(--flow);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 3px var(--flow-glow);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* 大进度环 - 带光晕 */
+.ring-mini {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+
+.ring-mini svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  filter: drop-shadow(0 0 6px var(--done-glow));
+}
+
+.ring-mini circle {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.ring-mini .track { stroke: var(--border); }
+.ring-mini .fill {
+  stroke: var(--done-border);
+  transition: stroke-dashoffset 800ms var(--ease);
+}
+
+.ring-mini-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.conn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 7px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  backdrop-filter: blur(20px);
+}
+
+.conn-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--done-border);
+  box-shadow: 0 0 0 3px var(--done-glow), 0 0 8px var(--done-border);
+  animation: pulse 2s var(--ease-flow) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.9); }
+}
+
+/* ---------- 状态药丸 ---------- */
+.stat-pills {
+  display: flex;
+  gap: 8px;
+  padding: 0 28px 14px;
+  flex-shrink: 0;
+}
+
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  backdrop-filter: blur(20px);
+  transition: all 250ms var(--ease);
+}
+
+.stat-pill:hover {
+  transform: translateY(-1px);
+  border-color: var(--text-tertiary);
+}
+
+.stat-pill .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.stat-pill.done .dot { background: var(--done-border); box-shadow: 0 0 10px var(--done-glow); }
+.stat-pill.progress .dot { background: var(--progress-border); box-shadow: 0 0 10px var(--progress-glow); }
+.stat-pill.error .dot {
+  background: var(--error-border);
+  box-shadow: 0 0 10px var(--error-glow);
+  animation: pulse 1.5s infinite;
+}
+.stat-pill.pending .dot { background: var(--pending-border); }
+
+.stat-pill .num {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ---------- 画布 ---------- */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  padding: 0 28px 20px;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.canvas svg.flow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 流动连线 + 光点粒子 */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -28; }
+}
+
+@keyframes flow-dash-fast {
+  to { stroke-dashoffset: -56; }
+}
+
+.flow-line {
+  fill: none;
+  stroke: var(--flow);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 8;
+  opacity: 0.4;
+  animation: flow-dash 2s linear infinite;
+}
+
+.flow-line.active {
+  stroke: var(--progress-border);
+  opacity: 0.9;
+  stroke-width: 2.2;
+  animation: flow-dash-fast 1s linear infinite;
+  filter: drop-shadow(0 0 5px var(--progress-glow));
+}
+
+.flow-line.done {
+  stroke: var(--done-border);
+  opacity: 0.3;
+  stroke-dasharray: none;
+  stroke-width: 1.5;
+  animation: none;
+}
+
+.flow-line.error {
+  stroke: var(--error-border);
+  opacity: 0.65;
+  stroke-width: 2;
+  animation: flow-dash 1.2s linear infinite;
+  filter: drop-shadow(0 0 4px var(--error-glow));
+}
+
+/* 沿连线流动的光点 */
+.flow-particle {
+  fill: var(--flow);
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.flow-particle.active {
+  fill: var(--progress-border);
+}
+
+.flow-particle.done {
+  fill: var(--done-border);
+  opacity: 0.4;
+}
+
+/* ---------- Phase 分组 ---------- */
+.phase-zone {
+  position: absolute;
+  border-radius: 18px;
+  background: var(--bg-phase);
+  border: 1px solid var(--border-soft);
+  z-index: 0;
+  transition: all 400ms var(--ease);
+  backdrop-filter: blur(2px);
+}
+
+.phase-zone-label {
+  position: absolute;
+  top: 10px;
+  left: 16px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.phase-zone-label .phase-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.phase-zone.complete {
+  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.02);
+}
+.phase-zone.complete .phase-dot { background: var(--done-border); box-shadow: 0 0 6px var(--done-glow); }
+
+.phase-zone.active {
+  border-color: rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.03);
+}
+.phase-zone.active .phase-dot {
+  background: var(--progress-border);
+  box-shadow: 0 0 6px var(--progress-glow);
+  animation: pulse 2s infinite;
+}
+
+.phase-zone.blocked {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.03);
+}
+.phase-zone.blocked .phase-dot {
+  background: var(--error-border);
+  box-shadow: 0 0 6px var(--error-glow);
+  animation: pulse 1.2s infinite;
+}
+
+/* ---------- 节点（玻璃拟态升级版） ---------- */
+.node {
+  position: absolute;
+  width: 156px;
+  padding: 13px 15px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: all 300ms var(--ease);
+  backdrop-filter: blur(20px) saturate(180%);
+  z-index: 3;
+  animation: node-in 600ms var(--ease-bounce) backwards;
+  position: absolute;
+}
+
+.node::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), transparent 50%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes node-in {
+  from { opacity: 0; transform: scale(0.85) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.node:hover {
+  transform: translateY(-4px) scale(1.05);
+  border-color: var(--text-tertiary);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  z-index: 5;
+}
+
+/* 左侧状态条 */
+.node::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  transition: all 300ms var(--ease);
+}
+
+.node.pending::after { background: var(--pending-border); }
+.node.in-progress::after {
+  background: var(--progress-border);
+  box-shadow: 0 0 8px var(--progress-glow);
+}
+.node.done::after {
+  background: var(--done-border);
+  box-shadow: 0 0 6px var(--done-glow);
+}
+.node.error::after {
+  background: var(--error-border);
+  box-shadow: 0 0 8px var(--error-glow);
+}
+
+.node.pending { background: var(--pending-fill); }
+.node.in-progress {
+  background: var(--progress-fill);
+  border-color: rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 0 1px var(--progress-glow), 0 8px 24px rgba(245, 158, 11, 0.12);
+}
+.node.done {
+  background: var(--done-fill);
+  border-color: rgba(16, 185, 129, 0.35);
+  opacity: 0.92;
+}
+.node.done:hover { opacity: 1; }
+.node.error {
+  background: var(--error-fill);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 1px var(--error-glow), 0 8px 24px rgba(239, 68, 68, 0.15);
+}
+
+/* 呼吸光晕环 */
+.node.in-progress .node-glow,
+.node.error .node-glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 16px;
+  border: 1px solid currentColor;
+  opacity: 0;
+  animation: ring-pulse 2.5s var(--ease-flow) infinite;
+  pointer-events: none;
+}
+
+.node.in-progress .node-glow { color: var(--progress-border); }
+.node.error .node-glow { color: var(--error-border); animation-duration: 1.5s; }
+
+@keyframes ring-pulse {
+  0% { opacity: 0.5; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.15); }
+}
+
+/* 节点内容 */
+.node-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.node-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 300ms var(--ease);
+}
+
+.node.pending .node-icon {
+  background: rgba(82, 82, 91, 0.3);
+  color: var(--pending-text);
+  border: 1.5px solid var(--pending-border);
+}
+
+.node.in-progress .node-icon {
+  background: var(--progress-fill);
+  color: var(--progress-text);
+  border: 1.5px solid var(--progress-border);
+  box-shadow: 0 0 8px var(--progress-glow);
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.node.done .node-icon {
+  background: var(--done-fill);
+  color: var(--done-text);
+  border: 1.5px solid var(--done-border);
+  box-shadow: 0 0 6px var(--done-glow);
+}
+
+.node.error .node-icon {
+  background: var(--error-fill);
+  color: var(--error-text);
+  border: 1.5px solid var(--error-border);
+  box-shadow: 0 0 8px var(--error-glow);
+  animation: shake 2s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 90%, 100% { transform: translateX(0); }
+  92% { transform: translateX(-1px); }
+  94% { transform: translateX(1px); }
+  96% { transform: translateX(-1px); }
+  98% { transform: translateX(1px); }
+}
+
+.node-id {
+  font-family: "SF Mono", "JetBrains Mono", Monaco, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  letter-spacing: 0.03em;
+}
+
+.node-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.3;
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-meta {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.node.error .node-meta { color: var(--error-text); }
+
+.node-tag {
+  font-size: 8px;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #F59E0B, #D97706);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+}
+
+/* 状态变化闪烁 */
+@keyframes flash {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.08); box-shadow: 0 0 30px currentColor; }
+  100% { transform: scale(1); }
+}
+
+.node.flash { animation: flash 600ms var(--ease-flow); }
+
+/* ---------- 图例 ---------- */
+.legend {
+  position: absolute;
+  bottom: 12px;
+  left: 28px;
+  display: flex;
+  gap: 18px;
+  padding: 9px 16px;
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  z-index: 10;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend-line {
+  width: 26px;
+  height: 0;
+  border-top: 1.5px dashed var(--flow);
+  opacity: 0.5;
+}
+
+.legend-line.active {
+  border-top-color: var(--progress-border);
+  border-top-style: solid;
+  opacity: 0.9;
+  filter: drop-shadow(0 0 2px var(--progress-glow));
+}
+
+.legend-line.done {
+  border-top-color: var(--done-border);
+  border-top-style: solid;
+  opacity: 0.5;
+}
+
+.hint {
+  position: absolute;
+  bottom: 12px;
+  right: 28px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  z-index: 10;
+  padding: 9px 14px;
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="brand">
+        <div class="brand-logo">C</div>
+        <span class="brand-name">CodeViz</span>
+      </div>
+      <div class="project-pill">
+        <span>博客系统</span>
+        <span style="font-size:10px;color:var(--text-tertiary);">▾</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="ring-mini">
+        <svg viewBox="0 0 44 44">
+          <circle class="track" cx="22" cy="22" r="18"/>
+          <circle class="fill" cx="22" cy="22" r="18"
+                  stroke-dasharray="113.1" stroke-dashoffset="78.03"/>
+        </svg>
+        <span class="ring-mini-text">31%</span>
+      </div>
+      <div class="conn">
+        <span class="conn-dot"></span>
+        <span>实时</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-pills">
+    <div class="stat-pill done"><span class="dot"></span>完成 <span class="num">5</span></div>
+    <div class="stat-pill progress"><span class="dot"></span>进行中 <span class="num">1</span></div>
+    <div class="stat-pill error"><span class="dot"></span>报错 <span class="num">1</span></div>
+    <div class="stat-pill pending"><span class="dot"></span>未开始 <span class="num">9</span></div>
+  </div>
+
+  <div class="canvas-wrap">
+    <div class="canvas" id="canvas">
+
+      <!-- Phase 分组 -->
+      <div class="phase-zone complete" style="left: 1%; top: 6%; width: 18%; height: 88%;">
+        <span class="phase-zone-label"><span class="phase-dot"></span>Phase 1 · 基础</span>
+      </div>
+      <div class="phase-zone active" style="left: 21%; top: 6%; width: 18%; height: 88%;">
+        <span class="phase-zone-label"><span class="phase-dot"></span>Phase 2 · 认证</span>
+      </div>
+      <div class="phase-zone blocked" style="left: 41%; top: 6%; width: 18%; height: 88%;">
+        <span class="phase-zone-label"><span class="phase-dot"></span>Phase 3 · 文章</span>
+      </div>
+      <div class="phase-zone" style="left: 61%; top: 6%; width: 18%; height: 88%;">
+        <span class="phase-zone-label"><span class="phase-dot"></span>Phase 4 · 评论</span>
+      </div>
+      <div class="phase-zone" style="left: 81%; top: 6%; width: 18%; height: 50%;">
+        <span class="phase-zone-label"><span class="phase-dot"></span>Phase 5 · 后台</span>
+      </div>
+      <div class="phase-zone" style="left: 81%; top: 60%; width: 18%; height: 34%;">
+        <span class="phase-zone-label"><span class="phase-dot"></span>Phase 6 · 部署</span>
+      </div>
+
+      <!-- 连线 -->
+      <svg class="flow" id="flow-svg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arr-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="#8B5CF6" opacity="0.6"/>
+          </marker>
+          <marker id="arr-active" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="#F59E0B"/>
+          </marker>
+        </defs>
+        <g id="flow-lines"></g>
+        <g id="flow-particles"></g>
+      </svg>
+
+      <!-- 节点 -->
+      <div class="node done" style="left: 4%; top: 14%; animation-delay: 0ms;" data-id="T001">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">✓</span>
+          <span class="node-id">T001</span>
+        </div>
+        <div class="node-name">项目脚手架</div>
+        <div class="node-meta">2 文件 · 07-01</div>
+      </div>
+
+      <div class="node done" style="left: 4%; top: 42%; animation-delay: 60ms;" data-id="T002">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">✓</span>
+          <span class="node-id">T002</span>
+          <span class="node-tag">P</span>
+        </div>
+        <div class="node-name">Tailwind CSS</div>
+        <div class="node-meta">2 文件 · 07-01</div>
+      </div>
+
+      <div class="node done" style="left: 4%; top: 70%; animation-delay: 120ms;" data-id="T003">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">✓</span>
+          <span class="node-id">T003</span>
+        </div>
+        <div class="node-name">路由系统</div>
+        <div class="node-meta">1 文件 · 07-02</div>
+      </div>
+
+      <div class="node done" style="left: 24%; top: 18%; animation-delay: 180ms;" data-id="T004">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">✓</span>
+          <span class="node-id">T004</span>
+        </div>
+        <div class="node-name">User 数据模型</div>
+        <div class="node-meta">2 文件 · 07-02</div>
+      </div>
+
+      <div class="node in-progress" style="left: 24%; top: 46%; animation-delay: 240ms;" data-id="T005">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">◐</span>
+          <span class="node-id">T005</span>
+        </div>
+        <div class="node-name">登录页面</div>
+        <div class="node-meta">2 commits</div>
+      </div>
+
+      <div class="node pending" style="left: 24%; top: 74%; animation-delay: 300ms;" data-id="T006">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">○</span>
+          <span class="node-id">T006</span>
+          <span class="node-tag">P</span>
+        </div>
+        <div class="node-name">注册页面</div>
+        <div class="node-meta">1 文件</div>
+      </div>
+
+      <div class="node done" style="left: 44%; top: 14%; animation-delay: 360ms;" data-id="T007">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">✓</span>
+          <span class="node-id">T007</span>
+        </div>
+        <div class="node-name">Post 数据模型</div>
+        <div class="node-meta">2 文件 · 07-02</div>
+      </div>
+
+      <div class="node error" style="left: 44%; top: 42%; animation-delay: 420ms;" data-id="T008">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">✕</span>
+          <span class="node-id">T008</span>
+        </div>
+        <div class="node-name">文章列表页</div>
+        <div class="node-meta">TypeError:23</div>
+      </div>
+
+      <div class="node pending" style="left: 44%; top: 70%; animation-delay: 480ms;" data-id="T009">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">○</span>
+          <span class="node-id">T009</span>
+        </div>
+        <div class="node-name">文章详情页</div>
+        <div class="node-meta">2 文件</div>
+      </div>
+
+      <div class="node pending" style="left: 64%; top: 18%; animation-delay: 540ms;" data-id="T011">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">○</span>
+          <span class="node-id">T011</span>
+        </div>
+        <div class="node-name">Comment 模型</div>
+        <div class="node-meta">2 文件</div>
+      </div>
+
+      <div class="node pending" style="left: 64%; top: 46%; animation-delay: 600ms;" data-id="T012">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">○</span>
+          <span class="node-id">T012</span>
+        </div>
+        <div class="node-name">评论组件</div>
+        <div class="node-meta">2 文件</div>
+      </div>
+
+      <div class="node pending" style="left: 84%; top: 18%; animation-delay: 660ms;" data-id="T013">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">○</span>
+          <span class="node-id">T013</span>
+        </div>
+        <div class="node-name">后台布局</div>
+        <div class="node-meta">2 文件</div>
+      </div>
+
+      <div class="node pending" style="left: 84%; top: 70%; animation-delay: 720ms;" data-id="T015">
+        <span class="node-glow"></span>
+        <div class="node-head">
+          <span class="node-icon">○</span>
+          <span class="node-id">T015</span>
+        </div>
+        <div class="node-name">性能优化</div>
+        <div class="node-meta">1 文件</div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item">
+          <span class="legend-line"></span>
+          <span>依赖流动</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-line active"></span>
+          <span>进行中</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-line done"></span>
+          <span>已完成</span>
+        </div>
+      </div>
+
+      <div class="hint">虚线流向 = 依赖 · 光点 = 数据流</div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const svg = document.getElementById('flow-svg');
+const linesGroup = document.getElementById('flow-lines');
+const particlesGroup = document.getElementById('flow-particles');
+
+const dependencies = {
+  T002: ['T001'],
+  T003: ['T001'],
+  T004: ['T001'],
+  T005: ['T003', 'T004'],
+  T006: ['T004'],
+  T007: ['T004'],
+  T008: ['T003', 'T007'],
+  T009: ['T007'],
+  T011: ['T007'],
+  T012: ['T011'],
+  T013: ['T005'],
+  T015: ['T009']
+};
+
+const nodeStatus = {};
+document.querySelectorAll('.node').forEach(n => {
+  const id = n.dataset.id;
+  if (n.classList.contains('done')) nodeStatus[id] = 'done';
+  else if (n.classList.contains('in-progress')) nodeStatus[id] = 'in-progress';
+  else if (n.classList.contains('error')) nodeStatus[id] = 'error';
+  else nodeStatus[id] = 'pending';
+});
+
+const pathData = []; // 存储连线信息用于画光点
+
+function drawLines() {
+  linesGroup.innerHTML = '';
+  particlesGroup.innerHTML = '';
+  pathData.length = 0;
+  const canvasRect = canvas.getBoundingClientRect();
+
+  let lineIdx = 0;
+  Object.entries(dependencies).forEach(([toId, fromIds]) => {
+    fromIds.forEach(fromId => {
+      const fromNode = document.querySelector(`[data-id="${fromId}"]`);
+      const toNode = document.querySelector(`[data-id="${toId}"]`);
+      if (!fromNode || !toNode) return;
+
+      const fromRect = fromNode.getBoundingClientRect();
+      const toRect = toNode.getBoundingClientRect();
+
+      const fromX = fromRect.left + fromRect.width / 2 - canvasRect.left;
+      const fromY = fromRect.top + fromRect.height / 2 - canvasRect.top;
+      const toX = toRect.left + toRect.width / 2 - canvasRect.left;
+      const toY = toRect.top + toRect.height / 2 - canvasRect.top;
+
+      const dx = toX - fromX;
+      const cp1x = fromX + dx * 0.5;
+      const cp1y = fromY;
+      const cp2x = toX - dx * 0.5;
+      const cp2y = toY;
+
+      const d = `M ${fromX} ${fromY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toX} ${toY}`;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+
+      const toStatus = nodeStatus[toId];
+      let pathClass = 'flow-line';
+      let marker = 'url(#arr-flow)';
+
+      if (toStatus === 'in-progress') {
+        pathClass = 'flow-line active';
+        marker = 'url(#arr-active)';
+      } else if (toStatus === 'done') {
+        pathClass = 'flow-line done';
+        marker = '';
+      } else if (toStatus === 'error') {
+        pathClass = 'flow-line error';
+        marker = 'url(#arr-active)';
+      }
+
+      path.setAttribute('class', pathClass);
+      if (marker) path.setAttribute('marker-end', marker);
+      path.setAttribute('id', `flow-${lineIdx}`);
+      linesGroup.appendChild(path);
+
+      // 存储路径信息用于画光点
+      pathData.push({
+        id: lineIdx,
+        d: d,
+        status: toStatus,
+        duration: toStatus === 'in-progress' ? 1500 : toStatus === 'error' ? 1200 : 3000
+      });
+
+      lineIdx++;
+    });
+  });
+
+  // 为进行中和报错的连线添加流动光点
+  createParticles();
+}
+
+function createParticles() {
+  particlesGroup.innerHTML = '';
+  pathData.forEach(p => {
+    if (p.status === 'done') return; // 完成的不画光点
+
+    const particleCount = p.status === 'in-progress' || p.status === 'error' ? 2 : 1;
+
+    for (let i = 0; i < particleCount; i++) {
+      const particle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      particle.setAttribute('r', '2.5');
+      particle.setAttribute('class', `flow-particle ${p.status === 'in-progress' ? 'active' : p.status === 'done' ? 'done' : ''}`);
+
+      const animateMotion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+      animateMotion.setAttribute('dur', `${p.duration}ms`);
+      animateMotion.setAttribute('repeatCount', 'indefinite');
+      animateMotion.setAttribute('path', p.d);
+      animateMotion.setAttribute('begin', `${i * (p.duration / particleCount)}ms`);
+
+      particle.appendChild(animateMotion);
+      particlesGroup.appendChild(particle);
+    }
+  });
+}
+
+drawLines();
+window.addEventListener('resize', () => setTimeout(drawLines, 100));
+
+// 演示
+setTimeout(() => {
+  const t006 = document.querySelector('[data-id="T006"]');
+  if (!t006) return;
+  t006.classList.remove('pending');
+  t006.classList.add('in-progress', 'flash');
+  t006.querySelector('.node-icon').textContent = '◐';
+  t006.querySelector('.node-meta').textContent = '1 commit';
+  nodeStatus['T006'] = 'in-progress';
+  setTimeout(() => t006.classList.remove('flash'), 600);
+  drawLines();
+}, 3000);
+
+setTimeout(() => {
+  const t006 = document.querySelector('[data-id="T006"]');
+  if (!t006) return;
+  t006.classList.remove('in-progress');
+  t006.classList.add('done', 'flash');
+  t006.querySelector('.node-icon').textContent = '✓';
+  t006.querySelector('.node-meta').textContent = '1 文件 · 07-03';
+  nodeStatus['T006'] = 'done';
+  setTimeout(() => t006.classList.remove('flash'), 600);
+  drawLines();
+}, 6500);
+</script>
+
+</body>
+</html>

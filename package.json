@@ -1,0 +1,27 @@
+{
+  "name": "codeviz",
+  "version": "0.1.0",
+  "description": "Realtime project progress map for AI-assisted development. Renders tasks.md as an interactive dependency graph with live file/git inference.",
+  "type": "commonjs",
+  "bin": {
+    "codeviz": "bin/codeviz.js"
+  },
+  "scripts": {
+    "start": "node bin/codeviz.js",
+    "demo": "node bin/codeviz.js examples --port 7879",
+    "check": "node --check bin/codeviz.js && node --check src/parser.js && node --check src/server.js && node --check src/inferencer.js && node --check src/git-tracker.js && node --check src/project-manager.js && node --check src/watcher.js && node --check templates/client.js",
+    "test": "node tests/smoke.test.js && node tests/realtime.test.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {},
+  "keywords": ["tasks", "progress", "visualization", "ai", "claude-code", "codex", "developer-tools"],
+  "author": "qixian771-spec",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/qixian771-spec/codeviz.git"
+  },
+  "homepage": "https://github.com/qixian771-spec/codeviz"
+}

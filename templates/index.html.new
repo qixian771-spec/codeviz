@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeViz 视觉设计稿 - 墨白出品</title>
+<style>
+/* ============================================================
+   CodeViz 导图视觉系统 - by 墨白
+   设计原则：信息密度高但不挤、状态 0.5 秒可识别、60fps 动效
+   ============================================================ */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ---------- 配色系统（CSS 变量驱动，明暗两套） ---------- */
+:root {
+  /* 背景层级 */
+  --bg-app: #F7F7F8;
+  --bg-surface: #FFFFFF;
+  --bg-elevated: #FAFAFB;
+  --bg-inset: #F0F0F2;
+
+  /* 文字层级 */
+  --text-primary: #18181B;
+  --text-secondary: #52525B;
+  --text-tertiary: #A1A1AA;
+  --text-inverse: #FFFFFF;
+
+  /* 边框 */
+  --border-subtle: #E4E4E7;
+  --border-default: #D4D4D8;
+  --border-strong: #A1A1AA;
+
+  /* 四态配色 - 亮色模式（填充/边框/文字三段式） */
+  --pending-fill: #F4F4F5;
+  --pending-border: #D4D4D8;
+  --pending-text: #71717A;
+  --pending-glow: rgba(161, 161, 170, 0.15);
+
+  --progress-fill: #FEF3C7;
+  --progress-border: #F59E0B;
+  --progress-text: #92400E;
+  --progress-glow: rgba(245, 158, 11, 0.25);
+
+  --done-fill: #D1FAE5;
+  --done-border: #10B981;
+  --done-text: #065F46;
+  --done-glow: rgba(16, 185, 129, 0.2);
+
+  --error-fill: #FEE2E2;
+  --error-border: #EF4444;
+  --error-text: #991B1B;
+  --error-glow: rgba(239, 68, 68, 0.25);
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+
+  /* 动效曲线（不用 ease/linear，每个都指定） */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-magnetic: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-pulse: cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* ---------- 暗色模式（非简单反色，重调对比度） ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-app: #0F0F11;
+    --bg-surface: #1A1A1E;
+    --bg-elevated: #232328;
+    --bg-inset: #2A2A30;
+
+    --text-primary: #F4F4F5;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #71717A;
+    --text-inverse: #18181B;
+
+    --border-subtle: #2A2A30;
+    --border-default: #3F3F46;
+    --border-strong: #52525B;
+
+    /* 暗色四态：填充用深色，边框用亮色，文字用浅色保证对比度 */
+    --pending-fill: #2A2A30;
+    --pending-border: #52525B;
+    --pending-text: #A1A1AA;
+    --pending-glow: rgba(113, 113, 122, 0.2);
+
+    --progress-fill: #422006;
+    --progress-border: #F59E0B;
+    --progress-text: #FCD34D;
+    --progress-glow: rgba(245, 158, 11, 0.3);
+
+    --done-fill: #064E3B;
+    --done-border: #10B981;
+    --done-text: #6EE7B7;
+    --done-glow: rgba(16, 185, 129, 0.25);
+
+    --error-fill: #7F1D1D;
+    --error-border: #EF4444;
+    --error-text: #FCA5A5;
+    --error-glow: rgba(239, 68, 68, 0.3);
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  }
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02", "cv03", "cv04";
+}
+
+/* ============================================================
+   顶部导航栏
+   ============================================================ */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--done-border), var(--progress-border));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-inverse);
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 6px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--done-border);
+  box-shadow: 0 0 0 3px var(--done-glow);
+  animation: pulse-dot 2s var(--ease-pulse) infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================================
+   主体布局：左侧栏 + 右侧导图区
+   桌面双屏优化：左侧固定 260px，右侧自适应
+   ============================================================ */
+.layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 0;
+  max-width: 1600px;
+  margin: 0 auto;
+  min-height: calc(100vh - 61px);
+}
+
+/* ---------- 左侧栏 ---------- */
+.sidebar {
+  padding: 24px 20px;
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.sidebar-section h3 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+/* 项目列表项 */
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  transition: all 200ms var(--ease-magnetic);
+  margin-bottom: 2px;
+}
+
+.project-item:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+.project-item.active {
+  background: var(--bg-inset);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.project-icon {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--border-strong);
+  flex-shrink: 0;
+}
+
+.project-item.active .project-icon {
+  background: var(--done-border);
+}
+
+/* 进度环（SVG） */
+.progress-ring-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+
+.progress-ring {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.progress-ring-bg {
+  fill: none;
+  stroke: var(--bg-inset);
+  stroke-width: 6;
+}
+
+.progress-ring-fg {
+  fill: none;
+  stroke: var(--done-border);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset 600ms var(--ease-spring);
+}
+
+.progress-ring-text {
+  font-size: 16px;
+  font-weight: 600;
+  fill: var(--text-primary);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.progress-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-stats .label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.progress-stats .value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 统计数字网格 */
+.stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stat-cell {
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  border-left: 3px solid var(--pending-border);
+}
+
+.stat-cell.done { border-left-color: var(--done-border); }
+.stat-cell.progress { border-left-color: var(--progress-border); }
+.stat-cell.error { border-left-color: var(--error-border); }
+
+.stat-cell .num {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.stat-cell .label {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.stat-cell.done .num { color: var(--done-border); }
+.stat-cell.progress .num { color: var(--progress-border); }
+.stat-cell.error .num { color: var(--error-border); }
+
+/* ============================================================
+   右侧导图主区
+   ============================================================ */
+.main {
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+.project-header {
+  margin-bottom: 24px;
+}
+
+.project-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.project-meta {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  display: flex;
+  gap: 16px;
+}
+
+.project-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ---------- Phase 阶段卡片 ---------- */
+.phase {
+  margin-bottom: 28px;
+  animation: phase-enter 400ms var(--ease-spring) backwards;
+}
+
+@keyframes phase-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.phase-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+
+.phase-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.phase-count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  padding: 2px 8px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+}
+
+.phase-progress {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-inset);
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 200px;
+}
+
+.phase-progress-fill {
+  height: 100%;
+  background: var(--done-border);
+  border-radius: 2px;
+  transition: width 600ms var(--ease-spring);
+}
+
+.phase-percent {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ---------- 任务卡片网格 ---------- */
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+/* ---------- 单个任务卡片 ---------- */
+.task {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 250ms var(--ease-magnetic);
+  animation: task-enter 350ms var(--ease-spring) backwards;
+  overflow: hidden;
+}
+
+@keyframes task-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.task::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--pending-border);
+  transition: background 300ms var(--ease-spring);
+}
+
+.task:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.task:hover::before {
+  width: 4px;
+}
+
+/* 四态样式 */
+.task.pending::before { background: var(--pending-border); }
+.task.in-progress::before { background: var(--progress-border); }
+.task.done::before { background: var(--done-border); }
+.task.error::before { background: var(--error-border); }
+
+.task.in-progress {
+  background: linear-gradient(135deg, var(--bg-surface) 0%, var(--progress-fill) 400%);
+}
+
+.task.error {
+  border-color: var(--error-border);
+  box-shadow: 0 0 0 3px var(--error-glow);
+}
+
+.task.done {
+  opacity: 0.75;
+}
+
+.task.done:hover {
+  opacity: 1;
+}
+
+/* 状态变化时的脉冲动画 - 通过 JS 添加 .pulse 类触发 */
+.task.pulse {
+  animation: task-pulse 600ms var(--ease-pulse);
+}
+
+@keyframes task-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.03); box-shadow: var(--shadow-lg); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- 任务卡片内容 ---------- */
+.task-row1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.task-status-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  transition: all 300ms var(--ease-spring);
+}
+
+.task.pending .task-status-icon {
+  background: var(--pending-fill);
+  color: var(--pending-text);
+  border: 1.5px solid var(--pending-border);
+}
+
+.task.in-progress .task-status-icon {
+  background: var(--progress-fill);
+  color: var(--progress-text);
+  border: 1.5px solid var(--progress-border);
+  animation: spin 2s var(--ease-pulse) infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.task.done .task-status-icon {
+  background: var(--done-fill);
+  color: var(--done-text);
+  border: 1.5px solid var(--done-border);
+}
+
+.task.error .task-status-icon {
+  background: var(--error-fill);
+  color: var(--error-text);
+  border: 1.5px solid var(--error-border);
+  animation: shake 400ms var(--ease-pulse);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+.task-id {
+  font-family: "SF Mono", "JetBrains Mono", Monaco, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: var(--bg-inset);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+
+.task-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+  line-height: 1.3;
+}
+
+.task-parallel-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-inverse);
+  background: var(--progress-border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.task-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 依赖关系标签 */
+.task-deps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.task-dep-chip {
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--bg-inset);
+  border-radius: 3px;
+  color: var(--text-secondary);
+}
+
+/* 文件路径标签 */
+.task-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.task-file {
+  font-family: "SF Mono", "JetBrains Mono", Monaco, monospace;
+  font-size: 10px;
+  padding: 2px 7px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-file.exists {
+  color: var(--done-text);
+  border-color: var(--done-border);
+  background: var(--done-fill);
+}
+
+/* commit 信息 */
+.task-commits {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.task-commit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.task-commit-hash {
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 10px;
+  color: var(--progress-text);
+  background: var(--progress-fill);
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.task-commit-msg {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 完成时间 */
+.task-date {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-tertiary);
+}
+
+.empty-state-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+.empty-state-text {
+  font-size: 14px;
+}
+
+/* 响应式：窄屏时左侧栏收起 */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     顶部导航
+     ============================================================ -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-logo">C</div>
+    <span class="brand-name">CodeViz</span>
+  </div>
+  <div class="connection-status">
+    <span class="status-dot"></span>
+    <span id="conn-status">已连接</span>
+  </div>
+</div>
+
+<!-- ============================================================
+     主体布局
+     ============================================================ -->
+<div class="layout">
+
+  <!-- 左侧栏：项目列表 + 进度总览 + 统计 -->
+  <aside class="sidebar">
+
+    <!-- 项目列表 -->
+    <div class="sidebar-section">
+      <h3>项目</h3>
+      <div id="project-list">
+        <!-- 需要: project.id, project.name, project.active -->
+        <div class="project-item active">
+          <span class="project-icon"></span>
+          博客系统
+        </div>
+        <div class="project-item">
+          <span class="project-icon"></span>
+          电商后台
+        </div>
+      </div>
+    </div>
+
+    <!-- 进度总览（SVG 圆环） -->
+    <div class="sidebar-section">
+      <h3>总进度</h3>
+      <div class="progress-ring-wrap">
+        <!-- 需要: stats.done, stats.total（算百分比） -->
+        <svg class="progress-ring" viewBox="0 0 64 64">
+          <circle class="progress-ring-bg" cx="32" cy="32" r="26"/>
+          <circle class="progress-ring-fg" cx="32" cy="32" r="26"
+                  stroke-dasharray="163.36" stroke-dashoffset="112.31"/>
+          <text class="progress-ring-text" x="32" y="32">31%</text>
+        </svg>
+        <div class="progress-stats">
+          <span class="label">已完成</span>
+          <span class="value">5 / 16 任务</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计网格 -->
+    <div class="sidebar-section">
+      <h3>状态分布</h3>
+      <div class="stat-grid">
+        <!-- 需要: stats.done, stats.inProgress, stats.pending, stats.error -->
+        <div class="stat-cell done">
+          <div class="num">5</div>
+          <div class="label">已完成</div>
+        </div>
+        <div class="stat-cell progress">
+          <div class="num">0</div>
+          <div class="label">进行中</div>
+        </div>
+        <div class="stat-cell">
+          <div class="num">11</div>
+          <div class="label">未开始</div>
+        </div>
+        <div class="stat-cell error">
+          <div class="num">0</div>
+          <div class="label">报错</div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- 右侧：导图主区 -->
+  <main class="main">
+
+    <!-- 项目标题 -->
+    <div class="project-header">
+      <!-- 需要: project.name, tasks.length, lastCommitDate -->
+      <h1 class="project-title">博客系统</h1>
+      <div class="project-meta">
+        <span>16 个任务</span>
+        <span>6 个阶段</span>
+        <span>最后更新: 2026-07-03</span>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         Phase 1: 基础设施（全完成示例）
+         ============================================================ -->
+    <div class="phase" style="animation-delay: 0ms;">
+      <div class="phase-header">
+        <span class="phase-name">Phase 1: 基础设施</span>
+        <span class="phase-count">3 / 3</span>
+        <div class="phase-progress">
+          <div class="phase-progress-fill" style="width: 100%;"></div>
+        </div>
+        <span class="phase-percent">100%</span>
+      </div>
+      <div class="task-grid">
+
+        <!-- T001 - 已完成 -->
+        <!-- 需要: task.id, task.name, task.status, task.description, task.files, task.parallel -->
+        <div class="task done">
+          <div class="task-row1">
+            <span class="task-status-icon">✓</span>
+            <span class="task-id">T001</span>
+            <span class="task-name">初始化项目脚手架</span>
+          </div>
+          <div class="task-desc">初始化 Vite + Vue 3 + TypeScript 项目</div>
+          <div class="task-files">
+            <span class="task-file exists">package.json</span>
+            <span class="task-file exists">vite.config.ts</span>
+          </div>
+          <div class="task-date">完成于 2026-07-01</div>
+        </div>
+
+        <!-- T002 - 已完成 + 并行标记 -->
+        <div class="task done">
+          <div class="task-row1">
+            <span class="task-status-icon">✓</span>
+            <span class="task-id">T002</span>
+            <span class="task-name">配置 Tailwind CSS</span>
+            <span class="task-parallel-tag">P</span>
+          </div>
+          <div class="task-desc">集成 Tailwind CSS 4.0</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T001</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file exists">tailwind.config.js</span>
+            <span class="task-file exists">src/style.css</span>
+          </div>
+          <div class="task-date">完成于 2026-07-01</div>
+        </div>
+
+        <!-- T003 - 已完成 -->
+        <div class="task done">
+          <div class="task-row1">
+            <span class="task-status-icon">✓</span>
+            <span class="task-id">T003</span>
+            <span class="task-name">配置路由系统</span>
+          </div>
+          <div class="task-desc">实现 vue-router 路由</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T001</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file exists">src/router/index.ts</span>
+          </div>
+          <div class="task-date">完成于 2026-07-02</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================
+         Phase 2: 用户认证（部分完成示例）
+         ============================================================ -->
+    <div class="phase" style="animation-delay: 60ms;">
+      <div class="phase-header">
+        <span class="phase-name">Phase 2: 用户认证</span>
+        <span class="phase-count">1 / 3</span>
+        <div class="phase-progress">
+          <div class="phase-progress-fill" style="width: 33%;"></div>
+        </div>
+        <span class="phase-percent">33%</span>
+      </div>
+      <div class="task-grid">
+
+        <!-- T004 - 已完成 -->
+        <div class="task done">
+          <div class="task-row1">
+            <span class="task-status-icon">✓</span>
+            <span class="task-id">T004</span>
+            <span class="task-name">创建 User 数据模型</span>
+          </div>
+          <div class="task-desc">定义 User 接口和 API 封装</div>
+          <div class="task-files">
+            <span class="task-file exists">src/types/User.ts</span>
+            <span class="task-file exists">src/api/user.ts</span>
+          </div>
+          <div class="task-date">完成于 2026-07-02</div>
+        </div>
+
+        <!-- T005 - 进行中（演示进行中状态） -->
+        <!-- 需要: task.status="in-progress", task.relatedCommits, task.fileStats -->
+        <div class="task in-progress">
+          <div class="task-row1">
+            <span class="task-status-icon">◐</span>
+            <span class="task-id">T005</span>
+            <span class="task-name">实现登录页面</span>
+          </div>
+          <div class="task-desc">实现登录表单和 JWT 鉴权</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T003</span>
+            <span class="task-dep-chip">T004</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file exists">src/views/Login.vue</span>
+            <span class="task-file">src/components/LoginForm.vue</span>
+          </div>
+          <div class="task-commits">
+            <div class="task-commit">
+              <span class="task-commit-hash">a3f2c1d</span>
+              <span class="task-commit-msg">feat: 登录页骨架和表单布局</span>
+            </div>
+            <div class="task-commit">
+              <span class="task-commit-hash">b8e4d2f</span>
+              <span class="task-commit-msg">feat: JWT 鉴权逻辑</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- T006 - 未开始 + 并行 -->
+        <div class="task pending">
+          <div class="task-row1">
+            <span class="task-status-icon">○</span>
+            <span class="task-id">T006</span>
+            <span class="task-name">实现注册页面</span>
+            <span class="task-parallel-tag">P</span>
+          </div>
+          <div class="task-desc">实现注册表单和验证</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T004</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file">src/views/Register.vue</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ============================================================
+         Phase 3: 文章管理（报错示例）
+         ============================================================ -->
+    <div class="phase" style="animation-delay: 120ms;">
+      <div class="phase-header">
+        <span class="phase-name">Phase 3: 文章管理</span>
+        <span class="phase-count">1 / 4</span>
+        <div class="phase-progress">
+          <div class="phase-progress-fill" style="width: 25%;"></div>
+        </div>
+        <span class="phase-percent">25%</span>
+      </div>
+      <div class="task-grid">
+
+        <!-- T007 - 已完成 -->
+        <div class="task done">
+          <div class="task-row1">
+            <span class="task-status-icon">✓</span>
+            <span class="task-id">T007</span>
+            <span class="task-name">创建 Post 数据模型</span>
+          </div>
+          <div class="task-desc">定义 Post 接口和 CRUD API</div>
+          <div class="task-files">
+            <span class="task-file exists">src/types/Post.ts</span>
+            <span class="task-file exists">src/api/post.ts</span>
+          </div>
+          <div class="task-date">完成于 2026-07-02</div>
+        </div>
+
+        <!-- T008 - 报错状态（演示红色 + 错误信息） -->
+        <!-- 需要: task.status="error", task.errorMessage -->
+        <div class="task error">
+          <div class="task-row1">
+            <span class="task-status-icon">✕</span>
+            <span class="task-id">T008</span>
+            <span class="task-name">实现文章列表页</span>
+          </div>
+          <div class="task-desc">实现分页文章列表</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T003</span>
+            <span class="task-dep-chip">T007</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file exists">src/views/Posts.vue</span>
+            <span class="task-file">src/components/PostList.vue</span>
+            <span class="task-file">src/components/Pagination.vue</span>
+          </div>
+          <div class="task-commits">
+            <div class="task-commit">
+              <span class="task-commit-hash" style="background:var(--error-fill);color:var(--error-text);">c5f8a3e</span>
+              <span class="task-commit-msg">feat: 列表页布局</span>
+            </div>
+          </div>
+          <div class="task-date" style="color:var(--error-text);">
+            ⚠ TypeError: Cannot read property 'map' of undefined at PostList.vue:23
+          </div>
+        </div>
+
+        <!-- T009 - 未开始 -->
+        <div class="task pending">
+          <div class="task-row1">
+            <span class="task-status-icon">○</span>
+            <span class="task-id">T009</span>
+            <span class="task-name">实现文章详情页</span>
+          </div>
+          <div class="task-desc">实现 Markdown 渲染和目录</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T007</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file">src/views/PostDetail.vue</span>
+            <span class="task-file">src/components/MarkdownRenderer.vue</span>
+          </div>
+        </div>
+
+        <!-- T010 - 未开始 + 并行 -->
+        <div class="task pending">
+          <div class="task-row1">
+            <span class="task-status-icon">○</span>
+            <span class="task-id">T010</span>
+            <span class="task-name">实现文章编辑器</span>
+            <span class="task-parallel-tag">P</span>
+          </div>
+          <div class="task-desc">实现富文本编辑和草稿保存</div>
+          <div class="task-deps">
+            依赖
+            <span class="task-dep-chip">T007</span>
+          </div>
+          <div class="task-files">
+            <span class="task-file">src/views/PostEditor.vue</span>
+            <span class="task-file">src/components/MarkdownEditor.vue</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 后续 Phase 用省略号表示 -->
+    <div class="phase" style="animation-delay: 180ms; opacity: 0.5;">
+      <div class="phase-header">
+        <span class="phase-name">Phase 4-6: 评论 / 后台 / 部署</span>
+        <span class="phase-count">0 / 6</span>
+        <div class="phase-progress">
+          <div class="phase-progress-fill" style="width: 0%;"></div>
+        </div>
+        <span class="phase-percent">0%</span>
+      </div>
+      <div style="padding: 20px; text-align: center; color: var(--text-tertiary); font-size: 13px;">
+        后续阶段任务未开始，展开后显示
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ============================================================
+// 状态变化动效演示 - 模拟一个任务从 pending → in-progress → done
+// 吴八哥接后端时，WebSocket 收到 tasks.updated 消息后调用此逻辑
+// ============================================================
+
+function simulateStatusChange() {
+  // 找到 T006（未开始），3秒后变成进行中，再3秒变成完成
+  const task = document.querySelectorAll('.task')[4]; // T006
+  if (!task) return;
+
+  setTimeout(() => {
+    task.classList.remove('pending');
+    task.classList.add('in-progress', 'pulse');
+    task.querySelector('.task-status-icon').textContent = '◐';
+    setTimeout(() => task.classList.remove('pulse'), 600);
+  }, 3000);
+
+  setTimeout(() => {
+    task.classList.remove('in-progress', 'pulse');
+    task.classList.add('done', 'pulse');
+    task.querySelector('.task-status-icon').textContent = '✓';
+    setTimeout(() => task.classList.remove('pulse'), 600);
+  }, 6000);
+}
+
+// 页面加载后 1 秒开始演示
+setTimeout(simulateStatusChange, 1000);
+
+// ============================================================
+// 数据接口说明（给吴八哥看）
+// ============================================================
+// 每个任务卡片需要以下字段：
+// {
+//   id: "T001",              // 任务 ID
+//   name: "初始化项目脚手架",  // 任务名
+//   status: "done",          // pending | in-progress | done | error
+//   parallel: false,         // 是否可并行（显示 P 标签）
+//   description: "...",      // 任务描述
+//   files: ["a.ts","b.ts"],  // 关联文件
+//   fileStats: { existing: 2, total: 2 },  // 文件存在情况（决定 .exists 样式）
+//   depends: ["T001"],       // 依赖任务 ID 数组
+//   relatedCommits: [        // 关联 commit（进行中/报错才显示）
+//     { hash: "a3f2c1d", message: "feat: ..." }
+//   ],
+//   lastCommitDate: "2026-07-03",
+//   errorMessage: "TypeError: ...",  // 报错时显示
+//   completedDate: "2026-07-01"      // 完成时显示
+// }
+//
+// Phase 需要：
+// { id, name, tasks: [...], stats: { done, total } }
+//
+// 全局统计：
+// { total, done, inProgress, pending, error }
+// → 用于左侧进度环和统计网格
+// ============================================================
+</script>
+
+</body>
+</html>
